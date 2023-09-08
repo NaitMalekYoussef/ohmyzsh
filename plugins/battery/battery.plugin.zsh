@@ -143,46 +143,6 @@ elif [[ "$OSTYPE" = linux-android ]] && (( ${+commands[termux-battery-status]} )
       echo "%{$fg[$color]%}${battery_pct}%%%{$reset_color%}"
     fi
   }
-elif [[ "$OSTYPE" = openbsd* ]]; then
-  function battery_is_charging() {
-    [[ $(apm -b) -eq 3 ]]
-  }
-  function battery_pct() {
-    apm -l
-  }
-  function battery_pct_remaining() {
-    if ! battery_is_charging; then
-      battery_pct
-    else
-      echo "External Power"
-    fi
-  }
-  function battery_time_remaining() {
-    local remaining_time
-    remaining_time=$(apm -m)
-    if [[ $remaining_time -ge 0 ]]; then
-      ((hour = $remaining_time / 60 ))
-      ((minute = $remaining_time % 60 ))
-      printf %02d:%02d $hour $minute
-    fi
-  }
-  function battery_pct_prompt() {
-    local battery_pct color
-    battery_pct=$(battery_pct_remaining)
-    if battery_is_charging; then
-      echo "∞"
-    else
-      if [[ $battery_pct -gt 50 ]]; then
-        color='green'
-      elif [[ $battery_pct -gt 20 ]]; then
-        color='yellow'
-      else
-        color='red'
-      fi
-      echo "%{$fg[$color]%}${battery_pct}%%%{$reset_color%}"
-    fi
-  }
-
 elif [[ "$OSTYPE" = linux*  ]]; then
   function battery_is_charging() {
     if (( $+commands[acpitool] )); then
@@ -232,11 +192,29 @@ elif [[ "$OSTYPE" = linux*  ]]; then
       acpi 2>/dev/null | command grep -v "rate information unavailable" | cut -f3 -d ','
     fi
   }
-  function battery_pct_prompt() {
-    local battery_pct color
-    battery_pct=$(battery_pct_remaining)
+  function batter_charging_time(){
     if battery_is_charging; then
-      echo "∞"
+      
+    fi
+  }
+  function battery_pct_prompt() {
+    local battery_pct color st_color
+    battery_pct=$(battery_pct_remaining)
+    rmining_storage_pct=$(df -h | grep nvme0n1p4 | cut -f8 -d ' '| sed -r 's/%//g')
+    rmining_storage=$(df -h | grep nvme0n1p4 | cut -f7 -d ' ')
+      if [[ $rmining_storage_pct -gt 70 ]]; then
+        st_color='red'
+      elif [[ $rmining_storage_pct -gt 50 ]]; then
+        st_color='yellow'
+      else
+        st_color='green'
+      fi
+    if battery_is_charging; then
+      batter_charging_time=$(acpi 2>/dev/null | command grep -v "rate information unavailable" | cut -f3 -d ','| cut -f2 -d ' ')
+      batter_ch_pct=$(acpi 2>/dev/null | command grep -v "rate information unavailable" | cut -f2 -d ',')
+      
+
+      echo "%{$fg[$st_color]%}$emoji[floppy_disk] ${rmining_storage} %{$fg[blue]%}$emoji[electric_plug]${batter_ch_pct}% ${batter_charging_time}%{$reset_color%}"
     else
       if [[ $battery_pct -gt 50 ]]; then
         color='green'
@@ -245,7 +223,7 @@ elif [[ "$OSTYPE" = linux*  ]]; then
       else
         color='red'
       fi
-      echo "%{$fg[$color]%}${battery_pct}%%%{$reset_color%}"
+      echo "%{$fg[$st_color]%}$emoji[floppy_disk] ${rmining_storage} %{$fg[$color]%} $emoji[battery]${battery_pct}%%%{$reset_color%}"
     fi
   }
 else
@@ -254,6 +232,7 @@ else
   function battery_pct \
     battery_pct_remaining \
     battery_time_remaining \
+    batter_charging_time \
     battery_pct_prompt { }
 fi
 
